@@ -1,0 +1,25 @@
+server:
+  port: 8083
+spring:
+  application:
+    name: server-c
+  r2dbc:
+    url: r2dbc:mysql://localhost:3306/server_c_db
+    username: root
+    password:
+    pool:
+      initial-size: 50
+      max-size: 500
+      max-idle-time: 30s
+      validation-query: "SELECT 1"
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 12
+      lettuce:
+        pool:
+          max-active: 50
+          max-idle: 20
+          min-idle: 10
+          max-wait: 500ms

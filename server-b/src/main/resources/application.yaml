@@ -1,0 +1,26 @@
+server:
+  port: 8082
+spring:
+  application:
+    name: server-b
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 12
+      lettuce:
+        pool:
+          max-active: 50
+          max-idle: 20
+          min-idle: 10
+          max-wait: 500ms
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      concurrency: 16
+      group-id: "b-server-group"
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+        spring.json.value.default.type: "com.serverb.protocol.KafkaRequestData"
