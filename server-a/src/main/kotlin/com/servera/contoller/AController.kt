@@ -2,6 +2,7 @@ package com.servera.contoller
 
 import com.servera.protocol.DataDto
 import com.servera.service.AService
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.reactor.mono
 import org.springframework.web.bind.annotation.*
 
@@ -9,18 +10,22 @@ import org.springframework.web.bind.annotation.*
 @RequestMapping("/api")
 class AController(private val aService: AService) {
 
-    @PostMapping("/request")
-    fun handleRequest(
+    @PostMapping("/stream")
+    fun handleStreamRequest(
         @RequestHeader("User-Id") userId: String,
-        @RequestBody requestData: List<DataDto>
+        @RequestBody requestDataFlow: Flow<DataDto>
     ) = mono {
-        val requestCount = aService.incrementAndGetRequestCount(userId)
-
-        if (requestCount > 10) {
-            "A 서버: 요청 제한 초과 (429 Too Many Requests)"
-        } else {
-            aService.processRequest(userId, requestData, requestCount)
-            "A 서버: 요청 처리 완료"
-        }
+        requestDataFlow
+            .map { data -> data to aService.isDuplicateRequestAllowed(userId, data) }
+            .filter { it.second }
+            .map { it.first }
+            .buffer(1000)
+            .toList(mutableListOf())
+            .let { batch ->
+                if (batch.isNotEmpty()) {
+                    aService.processBatch(userId, batch)
+                }
+            }
+        "A 서버: Streaming 요청 처리 완료"
     }
 }

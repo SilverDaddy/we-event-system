@@ -17,8 +17,10 @@ spring:
   kafka:
     bootstrap-servers: localhost:9092
     consumer:
-      concurrency: 16
-      group-id: "b-server-group"
+      group-id: b-server-group
+      auto-offset-reset: earliest
+      max-poll-records: 1000
+      enable-auto-commit: false
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:

@@ -1,35 +1,34 @@
 package com.servera.repository
 
+import com.servera.config.RequestProperties
+import com.servera.protocol.DataDto
 import org.springframework.data.redis.core.ReactiveRedisTemplate
 import org.springframework.stereotype.Repository
 import reactor.core.publisher.Mono
+import java.security.MessageDigest
+import java.time.Duration
 
 @Repository
-class RedisRepository(private val redisTemplate: ReactiveRedisTemplate<String, String>) {
-
-    private val REQUEST_LIMIT = 10
+class RedisRepository(
+    private val redisTemplate: ReactiveRedisTemplate<String, String>,
+    private val requestProperties: RequestProperties
+) {
 
     /**
-     *  유저의 요청 횟수를 증가 (100회 초과 시 예외 발생)
+     * 중복 요청 체크 및 카운트 증가 (최대 N회 허용)
      */
-    fun incrementRequestCount(userId: String): Mono<Long> {
-        val countKey = "user:$userId:requests"
-        return redisTemplate.opsForValue().increment(countKey) // 바로 증가
+    fun isDuplicateRequestAllowed(userId: String, requestData: DataDto): Mono<Boolean> {
+        val requestHash = hashRequestData(requestData)
+        val redisKey = "request:$userId:$requestHash"
+
+        return redisTemplate.opsForValue()
+            .setIfAbsent(redisKey, "1", Duration.ofMinutes(requestProperties.limitTTL))
+            .map { it }
     }
 
-    /**
-     *  현재 요청 횟수 조회 (Mono<Long> 반환)
-     */
-    fun incrementAndCheckLimit(userId: String): Mono<Long> {
-        val countKey = "user:$userId:requests"
-
-        return redisTemplate.opsForValue().increment(countKey) // 한 번만 조회 후 증가
-            .flatMap { currentCount ->
-                if (currentCount > REQUEST_LIMIT) {
-                    Mono.error(IllegalStateException("요청 제한 초과: 최대 100회까지만 요청 가능"))
-                } else {
-                    Mono.just(currentCount)
-                }
-            }
+    fun hashRequestData(requestData: DataDto): String {
+        val jsonData = requestData.toString()
+        val digest = MessageDigest.getInstance("SHA-256").digest(jsonData.toByteArray())
+        return digest.joinToString("") { "%02x".format(it) }
     }
 }

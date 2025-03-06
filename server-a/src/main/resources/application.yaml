@@ -32,3 +32,6 @@ spring:
         spring.json.add.type.headers: false
       batch-size: 16384
       compression-type: gzip
+
+request:
+  duplicateLimit: 3 # 중복 요청 최대 허용 횟수

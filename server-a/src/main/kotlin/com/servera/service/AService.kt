@@ -18,19 +18,20 @@ class AService(
     private val kafkaTemplate: KafkaTemplate<String, KafkaRequestData>
 ) {
     /**
-     * 요청 횟수를 증가하고 100회 제한을 체크한 후 반환
+     * 동일 요청인지 확인 (중복 허용 횟수 초과 여부)
      */
-    suspend fun incrementAndGetRequestCount(userId: String): Long {
-        return redisRepository.incrementAndCheckLimit(userId).awaitSingle()
+    suspend fun isDuplicateRequestAllowed(userId: String, requestData: DataDto): Boolean {
+        return redisRepository.isDuplicateRequestAllowed(userId, requestData).awaitSingle()
     }
+
     /**
-     * 요청 데이터 처리 (MySQL 저장 + Kafka 메시지 전송 병렬 실행)
+     * Kafka 메시지 전송 + MySQL Batch Insert 동시 수행
      */
-    suspend fun processRequest(userId: String, requestData: List<DataDto>, requestCount: Long) = coroutineScope {
-        // MySQL 저장
+    suspend fun processBatch(userId: String, requestDataBatch: List<DataDto>) = coroutineScope {
+        // MySQL Batch Insert 실행 (비동기)
         launch {
             requestDataRepository.saveAll(
-                requestData.map {
+                requestDataBatch.map {
                     RequestData(
                         userId = userId,
                         field1 = it.field1,
@@ -48,10 +49,11 @@ class AService(
             ).collectList().awaitSingle()
         }
 
-        // Kafka 메시지 전송 (userId & requestCount 포함)
+        // Kafka 메시지 전송 실행
         launch {
-            val kafkaData = KafkaRequestData(userId, requestCount, requestData)
-            kafkaTemplate.send("request-topic", kafkaData)
+            kafkaTemplate.executeInTransaction { kafkaOperations ->
+                kafkaOperations.send("request-topic", KafkaRequestData(userId, requestDataBatch))
+            }
         }
     }
 }

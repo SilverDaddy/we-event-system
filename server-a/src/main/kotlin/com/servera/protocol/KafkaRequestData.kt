@@ -1,7 +1,6 @@
 package com.servera.protocol
 
 data class KafkaRequestData(
-    val userId: String, // userId
-    val requestCount: Long, //요청 횟수
+    val userId: String,
     val requestData: List<DataDto>
 )
