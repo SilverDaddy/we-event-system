@@ -1,11 +1,12 @@
 package com.servera.repository
 
+import com.github.benmanes.caffeine.cache.Caffeine
+import com.google.common.hash.Hashing
 import com.servera.config.RequestProperties
 import com.servera.protocol.DataDto
 import org.springframework.data.redis.core.ReactiveRedisTemplate
 import org.springframework.stereotype.Repository
 import reactor.core.publisher.Mono
-import java.security.MessageDigest
 import java.time.Duration
 
 @Repository
@@ -14,29 +15,42 @@ class RedisRepository(
     private val requestProperties: RequestProperties
 ) {
 
-    /**
-     * 중복 요청 체크 및 카운트 증가 (최대 N회 허용)
-     */
+    // Caffeine 캐시 설정: 최대 10만 개 항목, TTL 5분
+    private val localCache = Caffeine.newBuilder()
+        .expireAfterWrite(Duration.ofMinutes(requestProperties.limitTTL))
+        .maximumSize(100_000)
+        .build<String, Long>()
+
     fun isDuplicateRequestAllowed(userId: String, requestData: DataDto): Mono<Boolean> {
         val requestHash = hashRequestData(requestData)
         val redisKey = "request:$userId:$requestHash"
 
+        // 로컬 캐시 먼저 확인
+        val cachedCount = localCache.getIfPresent(redisKey)
+        if (cachedCount != null) {
+            return Mono.just(cachedCount <= requestProperties.duplicateLimit)
+        }
+
+        // Redis에서 조회 및 캐시 갱신
         return redisTemplate.opsForValue().setIfAbsent(redisKey, "1", Duration.ofMinutes(requestProperties.limitTTL))
             .flatMap { isFirstRequest ->
                 if (isFirstRequest) {
-                    // 최초 요청: 허용
+                    localCache.put(redisKey, 1L)
                     Mono.just(true)
                 } else {
-                    // 이미 존재하는 경우: 카운트 증가 후 duplicateLimit 이내인지 확인
                     redisTemplate.opsForValue().increment(redisKey, 1)
-                        .map { count -> count <= requestProperties.duplicateLimit }
+                        .map { count ->
+                            localCache.put(redisKey, count) // 로컬 캐시 동기화
+                            count <= requestProperties.duplicateLimit
+                        }
                 }
             }
     }
 
     fun hashRequestData(requestData: DataDto): String {
         val jsonData = requestData.toString()
-        val digest = MessageDigest.getInstance("SHA-256").digest(jsonData.toByteArray())
-        return digest.joinToString("") { "%02x".format(it) }
+        return Hashing.murmur3_128()
+            .hashString(jsonData, Charsets.UTF_8)
+            .toString()
     }
 }

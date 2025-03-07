@@ -17,7 +17,7 @@ class BService(
     @KafkaListener(
         topics = ["request-topic"],
         groupId = "b-server-group",
-        concurrency = "16",
+        concurrency = "20",
         batch = "true"
     )
     fun consumeRequest(kafkaDataBatch: List<KafkaRequestData>) {

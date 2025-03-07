@@ -9,6 +9,6 @@ class KafkaConfig {
 
     @Bean
     fun requestTopic(): NewTopic {
-        return NewTopic("request-topic", 3, 1) // 파티션 3개, 복제본 1개
+        return NewTopic("request-topic", 20, 1) // topic, partition, replication
     }
 }

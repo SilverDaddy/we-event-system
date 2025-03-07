@@ -35,3 +35,4 @@ spring:
 
 request:
   duplicateLimit: 3 # 중복 요청 최대 허용 횟수
+  limitTTL: 1 # TTL 설정(분)

@@ -11,8 +11,8 @@ import org.springframework.data.redis.connection.stream.StreamOffset
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate
 import org.springframework.data.redis.stream.StreamReceiver
 import org.springframework.stereotype.Component
-import reactor.core.scheduler.Schedulers
 import reactor.core.publisher.Flux
+import reactor.core.scheduler.Schedulers
 
 @Component
 class RedisStreamListener(
@@ -98,6 +98,7 @@ class RedisStreamListener(
             .flatMap { batch ->
                 finalDataRepository.saveAll(batch)
                     .collectList()
+                    .retry(3)
                     .doOnError { error -> logger.error("Batch insert error: ${error.message}", error) }
             }
             .then()

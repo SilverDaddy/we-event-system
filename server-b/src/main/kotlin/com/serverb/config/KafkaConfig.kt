@@ -16,7 +16,7 @@ class KafkaConfig {
 
     @Bean
     fun requestTopic(): NewTopic {
-        return NewTopic("request-topic", 3, 1)
+        return NewTopic("request-topic", 20, 1)
     }
 
     @Bean

@@ -4,6 +4,7 @@ import com.servera.protocol.DataDto
 import com.servera.service.AService
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.reactor.mono
+import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
 @RestController
@@ -26,6 +27,6 @@ class AController(private val aService: AService) {
                     aService.processBatch(batch)
                 }
             }
-        "A 서버: Streaming 요청 처리 완료"
+        ResponseEntity.noContent().build<Unit>()
     }
 }
