@@ -30,3 +30,5 @@
 ### 주요 기술 스택
 - Redis Stream Consumer (Reactive 방식으로 데이터 수신)
 - R2DBC + MySQL (비동기 배치 저장)
+---
+A, B, C 서버 모두 인프라 및 데이터베이스 자원할당 고려 및 설정이 필수
