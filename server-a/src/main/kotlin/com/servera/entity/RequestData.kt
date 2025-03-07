@@ -5,7 +5,6 @@ import org.springframework.data.relational.core.mapping.Table
 
 @Table("request_data")
 data class RequestData(
-    val userId: String,
     val field1: String,
     val field2: String,
     val field3: String,

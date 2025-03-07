@@ -5,6 +5,7 @@ import com.serverb.repository.RedisRepository
 import org.springframework.kafka.annotation.KafkaListener
 import org.springframework.stereotype.Service
 import reactor.core.publisher.Mono
+import java.util.*
 
 @Service
 class BService(
@@ -21,10 +22,18 @@ class BService(
     )
     fun consumeRequest(kafkaDataBatch: List<KafkaRequestData>) {
         val redisTasks = kafkaDataBatch.flatMap { kafkaData ->
-            val redisKey = "user:${kafkaData.userId}:${System.currentTimeMillis()}"
+            val redisKey = "data:${System.currentTimeMillis()}:${UUID.randomUUID()}"
             listOf(
-                redisRepository.saveData(redisKey, kafkaData.requestData),
+                redisRepository.saveData(redisKey, kafkaData.requestData)
+                    .onErrorResume {
+                        // TODO: 에러 처리 로직 추가
+                        Mono.empty()
+                    },
                 redisRepository.pushToStream("request-stream", kafkaData.requestData)
+                    .onErrorResume {
+                        // TODO: 에러 처리 로직 추가
+                        Mono.empty()
+                    }
             )
         }
 

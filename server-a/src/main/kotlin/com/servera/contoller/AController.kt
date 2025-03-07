@@ -23,7 +23,7 @@ class AController(private val aService: AService) {
             .toList(mutableListOf())
             .let { batch ->
                 if (batch.isNotEmpty()) {
-                    aService.processBatch(userId, batch)
+                    aService.processBatch(batch)
                 }
             }
         "A 서버: Streaming 요청 처리 완료"

@@ -3,11 +3,11 @@ package com.serverc.service
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.serverc.protocol.FinalDataDto
 import com.serverc.repository.FinalDataRepository
+import org.slf4j.LoggerFactory
 import org.springframework.data.redis.connection.RedisConnectionFactory
 import org.springframework.data.redis.connection.stream.Consumer
 import org.springframework.data.redis.connection.stream.ReadOffset
 import org.springframework.data.redis.connection.stream.StreamOffset
-import org.springframework.data.redis.core.ReactiveRedisTemplate
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate
 import org.springframework.data.redis.stream.StreamReceiver
 import org.springframework.stereotype.Component
@@ -21,6 +21,7 @@ class RedisStreamListener(
     private val objectMapper: ObjectMapper,
     private val finalDataRepository: FinalDataRepository
 ) {
+    private val logger = LoggerFactory.getLogger(RedisStreamListener::class.java)
     private val streamReceiver = StreamReceiver.create(redisTemplate.connectionFactory)
     private val streamKey = "request-stream"
     private val consumerGroup = "request-group"
@@ -43,7 +44,10 @@ class RedisStreamListener(
                 .getOrDefault(0) > 0
 
             if (!streamExists) {
-                redisTemplate.opsForStream<String, String>().add(streamKey, mapOf("init" to "true")).subscribe()
+                redisTemplate.opsForStream<String, String>().add(streamKey, mapOf("init" to "true")).subscribe(
+                    { logger.info("Stream '$streamKey' created with init entry.") },
+                    { error -> logger.error("Error creating stream '$streamKey': ${error.message}") }
+                )
             }
 
             // Consumer Group 존재 여부 체크 후 생성
@@ -52,12 +56,12 @@ class RedisStreamListener(
                 streamCommands.xGroupCreate(
                     streamKey.toByteArray(),
                     consumerGroup,
-                    ReadOffset.from("0"), // ✅ 처음부터 읽기
+                    ReadOffset.from("0"),
                     true
                 )
             }
         } catch (ex: Exception) {
-            println("Consumer Group 이미 존재 또는 Redis Stream 초기화 중 문제 발생: ${ex.message}")
+            logger.error("Error during stream initialization: ${ex.message}")
         }
     }
 
@@ -90,9 +94,11 @@ class RedisStreamListener(
      * Batch Insert 실행 (1000개 단위)
      */
     private fun batchInsert(dataList: List<FinalDataDto>) =
-        Flux.fromIterable(dataList.chunked(1000)) // 1000개 단위로 나눠서 저장
+        Flux.fromIterable(dataList.chunked(1000))
             .flatMap { batch ->
-                finalDataRepository.saveAll(batch).collectList() // 배치 저장
+                finalDataRepository.saveAll(batch)
+                    .collectList()
+                    .doOnError { error -> logger.error("Batch insert error: ${error.message}", error) }
             }
             .then()
 }
